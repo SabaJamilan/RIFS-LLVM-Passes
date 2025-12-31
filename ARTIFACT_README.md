@@ -2,8 +2,10 @@
 
 This repository contains LLVM passes, PIN-based profiling tooling, and benchmark build/run scripts.
 
-## What you must provide manually (explicit inputs)
-These are *not* auto-resolved by the scripts and must be set up by the user:
+## What you must run manually:
+chmod +x run_artifact.sh
+./run_artifact.sh --install-system --install-python
+## What is required to download:
 
 1) **Benchmarks**  
    - Download / place the benchmark sources under `benchmarks/` as expected by the scripts.
