@@ -17,17 +17,35 @@ python_codes="$ROOT_DIR/python-codes"
 cpp_files="$ROOT_DIR/cpp_files"
 raw_MakeFile_dir="$ROOT_DIR/raw_MakeFile_dir"
 
-# ---- LLVM toolchain ----
-: "${LLVM_20_build_ART:?env LLVM_20_build_ART must point to your LLVM bin dir root}"
-CLANG="$LLVM_20_build_ART/bin/clang"
-CLANGXX="$LLVM_20_build_ART/bin/clang++"
-OPT="$LLVM_20_build_ART/bin/opt"
-LLD="$LLVM_20_build_ART/bin/ld.lld"   # not strictly used here
-LLDIS="$LLVM_20_build_ART/bin/llvm-dis"
-LLVMDIS="$LLVM_20_build_ART/bin/llvm-dis"
-LLVMPROFDATA="$LLVM_20_build_ART/bin/llvm-profdata"
-LLVMCONFIG="$LLVM_20_build_ART/bin/llvm-config"
-# ---- Env echo ----
+# Require install prefix (preferred)
+: "${LLVM_20_install_ART:?env LLVM_20_install_ART must point to your LLVM install prefix}"
+TOOLBIN="$LLVM_20_install_ART/bin"
+
+# Optionally keep these for compatibility
+export LLVM_20_build="${LLVM_20_install_ART}"
+export LLVM_20_build_ART="${LLVM_20_install_ART}"
+
+CLANG="$TOOLBIN/clang"
+CLANGXX="$TOOLBIN/clang++"
+OPT="$TOOLBIN/opt"
+LLD="$TOOLBIN/ld.lld"
+LLDIS="$TOOLBIN/llvm-dis"
+LLVMDIS="$TOOLBIN/llvm-dis"
+LLVMPROFDATA="$TOOLBIN/llvm-profdata"
+LLVMCONFIG="$TOOLBIN/llvm-config"
+
+# Sanity checks (fail early)
+[[ -x "$CLANG" ]] || { echo "[ERROR] Missing clang at $CLANG"; exit 1; }
+[[ -x "$CLANGXX" ]] || { echo "[ERROR] Missing clang++ at $CLANGXX"; exit 1; }
+
+echo "[INFO] Using clang:  $CLANG"
+echo "[INFO] Resource dir: $("$CLANG" --print-resource-dir)"
+
+
+RES="$("$LLVM_20_install_ART/bin/clang" --print-resource-dir)"
+echo "RES=$RES"
+
+find "$RES" -name 'libclang_rt.profile.a' -o -name 'libclang_rt.profile*.a'
 PID=$$
 echo "==============================="
 echo "PID: $PID"
@@ -400,7 +418,7 @@ NON_SPEC_benchmark_compile_With_O3_PGO() {
     have_file "${app}.bc" || die "failed to extract ${app}.bc"
     "$LLDIS" "${app}.bc" -o "${app}_baseline_O3.ll"
     SRC_LL="${app}_baseline_O3.ll"
-
+    echo "SRC_LL: " $SRC_LL
     cp "$SRC_LL" $main_path/$DIRECTORY
 
     if [[ -n "${inputName:-}" ]] && [[ -e "$input_path/$inputName" ]]; then
@@ -445,7 +463,6 @@ NON_SPEC_benchmark_compile_With_O3_PGO() {
     profdir="${PWD}/profraw.${app}.$$"
 
     mkdir -p "$profdir"
-    echo " Write one file per process (and include the executable name). Absolute path avoids CWD surprises."
     export LLVM_PROFILE_FILE="${profdir}/pgo-%p-%m.profraw"
     echo "run ..."
     ./${app}"_baseline_O3_gen_opt" ${INPUTS[@]}
@@ -613,7 +630,6 @@ SPEC2017_benchmark_compile_With_O3_PGO() {
   echo " Put profiles in a dedicated dir and use a unique pattern to avoid mixing old runs."
   profdir="${PWD}/profraw.${app}.$$"
   mkdir -p "$profdir"
-  echo" Write one file per process (and include the executable name). Absolute path avoids CWD surprises."
   export LLVM_PROFILE_FILE="${profdir}/pgo-%p-%m.profraw"
   echo "run ..."
   #./${app}"_baseline_O3_gen_opt" $INPUTS

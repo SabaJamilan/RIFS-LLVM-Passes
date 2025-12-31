@@ -11,19 +11,41 @@ cores=${2:-}
 
 python_codes="$SCRIPT_DIR/python-codes"
 
-export LD_LIBRARY_PATH="$LLVM_20_build_ART/lib:${LD_LIBRARY_PATH:-}"
-export LIBRARY_PATH="$LLVM_20_build_ART/lib:${LIBRARY_PATH:-}"
+# Build everything you need (including compiler-rt)
+#ninja -C "$LLVM_20_build_ART" clang lld compiler-rt
 
-# ---- LLVM toolchain ----
-: "${LLVM_20_build:?env LLVM_20_build must point to your LLVM bin dir root}"
-CLANG="$LLVM_20_build_ART/bin/clang"
-CLANGXX="$LLVM_20_build_ART/bin/clang++"
-OPT="$LLVM_20_build_ART/bin/opt"
-LLD="$LLVM_20_build_ART/bin/ld.lld"   # not strictly used here
-LLDIS="$LLVM_20_build_ART/bin/llvm-dis"
-LLVMDIS="$LLVM_20_build_ART/bin/llvm-dis"
-LLVMPROFDATA="$LLVM_20_build_ART/bin/llvm-profdata"
-LLVMCONFIG="$LLVM_20_build_ART/bin/llvm-config"
+# Install into $LLVM_20_install_ART (this is what makes the runtime appear in the resource dir reliably)
+#ninja -C "$LLVM_20_build_ART" install
+
+# Require install prefix (preferred)
+: "${LLVM_20_install_ART:?env LLVM_20_install_ART must point to your LLVM install prefix}"
+TOOLBIN="$LLVM_20_install_ART/bin"
+
+# Optionally keep these for compatibility
+export LLVM_20_build="${LLVM_20_install_ART}"
+export LLVM_20_build_ART="${LLVM_20_install_ART}"
+
+CLANG="$TOOLBIN/clang"
+CLANGXX="$TOOLBIN/clang++"
+OPT="$TOOLBIN/opt"
+LLD="$TOOLBIN/ld.lld"
+LLDIS="$TOOLBIN/llvm-dis"
+LLVMDIS="$TOOLBIN/llvm-dis"
+LLVMPROFDATA="$TOOLBIN/llvm-profdata"
+LLVMCONFIG="$TOOLBIN/llvm-config"
+
+# Sanity checks (fail early)
+[[ -x "$CLANG" ]] || { echo "[ERROR] Missing clang at $CLANG"; exit 1; }
+[[ -x "$CLANGXX" ]] || { echo "[ERROR] Missing clang++ at $CLANGXX"; exit 1; }
+
+echo "[INFO] Using clang:  $CLANG"
+echo "[INFO] Resource dir: $("$CLANG" --print-resource-dir)"
+
+
+RES="$("$LLVM_20_install_ART/bin/clang" --print-resource-dir)"
+echo "RES=$RES"
+
+find "$RES" -name 'libclang_rt.profile.a' -o -name 'libclang_rt.profile*.a'
 # ---- Env echo ----
 PID=$$
 echo "==============================="
@@ -174,7 +196,7 @@ fi
 if [[ "$app" == "swaptions" ]]; then
   is_spec_bench=0
   compilerType="c++"
-  benchmark_path="benchmarks/parsec3.0/parsec-benchmark/pkgs/apps/swaptions/src"
+  benchmark_path="benchmarks/parsec-3.0/pkgs/apps/swaptions/src"
   SPECid="swaptions"
   dirname="cortex"
   compiler="clang++"
@@ -190,7 +212,7 @@ fi
 if [[ "$app" == "freqmine" ]]; then
   is_spec_bench=0
   compilerType="c++"
-  benchmark_path="benchmarks/parsec3.0/parsec-benchmark/pkgs/apps/freqmine/src"
+  benchmark_path="benchmarks/parsec-3.0/pkgs/apps/freqmine/src"
   SPECid="freqmine"
   dirname="cortex"
   compiler="clang++"
@@ -730,13 +752,15 @@ NON_SPEC_benchmark_compile_With_O3_PGO() {
     echo "########################## BASELINE -gline-tables-only ########################################"
     echo "1)   Generate baseline IR by using -gline-tables-only flag FOR CortexSuite ... "
     echo "###################################################################################"
-    cd $benchmark_path
-    rm $app-*
-    rm *.profdata
-    rm perf.data*
-    rm *-perfstats.txt
+    
+    cd $SCRIPT_DIR/$benchmark_path
+    echo "benchmark_path: " $benchmark_path
+    #rm $app-*
+    #rm *.profdata
+    #rm perf.data*
+    #rm *-perfstats.txt
 
-    python3 "$python_codes/config_changer_baseline.py" "${SPEC_DEBUG_FLAGS_O3[@]}" $benchmark_path/Makefile-baseline-raw $benchmark_path/Makefile
+    python3 "$python_codes/config_changer_baseline.py" "${SPEC_DEBUG_FLAGS_O3[@]}" $SCRIPT_DIR/$benchmark_path/Makefile-baseline-raw $SCRIPT_DIR/$benchmark_path/Makefile
     make clean
     make
     input_path=`pwd`
@@ -746,6 +770,7 @@ NON_SPEC_benchmark_compile_With_O3_PGO() {
     have_file "${app}.bc" || die "failed to extract ${app}.bc"
     "$LLDIS" "${app}.bc" -o "${app}_baseline_O3.ll"
     SRC_LL="${app}_baseline_O3.ll"
+    echo "SRC_LL: " $SRC_LL
 
     cp "$SRC_LL" $main_path/$DIRECTORY
     cp $INPUTS $main_path/$DIRECTORY
@@ -791,7 +816,6 @@ NON_SPEC_benchmark_compile_With_O3_PGO() {
     fi
 
     mkdir -p "$profdir"
-    echo" Write one file per process (and include the executable name). Absolute path avoids CWD surprises."
     export LLVM_PROFILE_FILE="${profdir}/pgo-%p-%m.profraw"
     echo "run ..."
     ./${app}"_baseline_O3_gen_opt" ${INPUTS[@]}

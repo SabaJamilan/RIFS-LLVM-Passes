@@ -43,21 +43,21 @@ git fetch --all --tags
 echo "[+] Checking out: $LLVM_REF"
 git checkout "$LLVM_REF"
 
-# ---- Configure ----
-echo "[+] Configuring CMake..."
 cmake -S "$LLVM_ROOT_ART/llvm" -B "$LLVM_20_build_ART" -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_INSTALL_PREFIX="$LLVM_20_install_ART" \
   -DLLVM_ENABLE_PROJECTS="clang;lld" \
   -DLLVM_TARGETS_TO_BUILD="X86" \
-  -DLLVM_ENABLE_RUNTIMES="compiler-rt"
-
-# ---- Build + install ----
-echo "[+] Building (ninja -j$JOBS)..."
-ninja -C "$LLVM_20_build_ART" -j"$JOBS"
-
-echo "[+] Installing..."
+  -DLLVM_ENABLE_RUNTIMES="compiler-rt" \
+  -DCOMPILER_RT_BUILD_PROFILE=ON
+ninja -C "$LLVM_20_build_ART" compiler-rt
 ninja -C "$LLVM_20_build_ART" install
+RES="$("$LLVM_20_install_ART/bin/clang" --print-resource-dir)"
+ls -lah "$RES/lib/x86_64-unknown-linux-gnu" | grep -i profile || true
+find "$RES" -name 'libclang_rt.profile.a' -o -name 'libclang_rt.profile*.a'
+
+
+
 
 echo
 echo "[+] LLVM build complete."
@@ -73,6 +73,7 @@ export LLVM_20_install_ART="$LLVM_20_install_ART"
 export PATH="\$LLVM_20_install_ART/bin:\$PATH"
 export LD_LIBRARY_PATH_ART="\$LLVM_20_install_ART/lib:\${LD_LIBRARY_PATH_ART:-}"
 EOF
+cd $ROOT_DIR
 chmod +x env_llvm20.sh
 echo "[+] Wrote: $ENV_FILE"
 echo "    Activate with:  source \"$ENV_FILE\""

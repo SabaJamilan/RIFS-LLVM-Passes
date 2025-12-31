@@ -32,18 +32,17 @@ add_line_if_missing 'add_subdirectory(FuncSpecPassIRSwitchCaseV3)' "$CMAKE_FILE"
 echo "[OK] Updated: $CMAKE_FILE"
 
 
-# ---- Configure ----
-echo "[+] Configuring CMake..."
-cmake -S "$LLVM_ROOT/llvm" -B "$LLVM_20_build_ART" -G Ninja \
+cmake -S "$LLVM_ROOT_ART/llvm" -B "$LLVM_20_build_ART" -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_INSTALL_PREFIX="$LLVM_20_install_ART" \
   -DLLVM_ENABLE_PROJECTS="clang;lld" \
   -DLLVM_TARGETS_TO_BUILD="X86" \
-  -DLLVM_ENABLE_RUNTIMES="compiler-rt"
+  -DLLVM_ENABLE_RUNTIMES="compiler-rt" \
+  -DCOMPILER_RT_BUILD_PROFILE=ON
 
-# ---- Build + install ----
-echo "[+] Building (ninja -j$JOBS)..."
-ninja -C "$LLVM_20_build_ART" -j"$JOBS"
-
-echo "[+] Installing..."
+ninja -C "$LLVM_20_build_ART" compiler-rt
 ninja -C "$LLVM_20_build_ART" install
+RES="$("$LLVM_20_install_ART/bin/clang" --print-resource-dir)"
+ls -lah "$RES/lib/x86_64-unknown-linux-gnu" | grep -i profile || true
+find "$RES" -name 'libclang_rt.profile.a' -o -name 'libclang_rt.profile*.a'
+
