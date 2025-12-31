@@ -4,6 +4,8 @@ This repository contains LLVM passes, PIN-based profiling tooling, and benchmark
 
 ## What you must run manually:
 chmod +x run_artifact.sh
+
+
 ./run_artifact.sh --install-system --install-python
 ## What is required to download:
 
